@@ -15,6 +15,9 @@ router = APIRouter()
 class FilmBase(BaseModel):
     title: str
     description: Optional[str] = None
+    backdrop_path: Optional[str] = None
+    poster_path: Optional[str] = None
+    description: Optional[str] = None
     release_year: Optional[int] = None
     language_id: int
     rental_duration: int
