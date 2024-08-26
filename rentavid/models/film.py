@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Float, Integer, String, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from ..dependencies import Base
 
 
 class Film(Base):
@@ -19,3 +19,4 @@ class Film(Base):
     replacement_cost = Column(Float)
     rating = Column(String)
     last_update = Column(DateTime)
+    categories = relationship("FilmCategory", back_populates="film")

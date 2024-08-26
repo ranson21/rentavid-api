@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from sqlalchemy.sql.expression import func
+
 
 from typing import List, Optional
 from datetime import datetime
@@ -40,6 +42,12 @@ class FilmResponse(FilmBase):
 
 
 # Film endpoints
+@router.get("/featured-films/", response_model=List[FilmResponse])
+def get_featured_films(db: Session = Depends(get_db)):
+    featured_films = db.query(Film).order_by(func.random()).limit(5).all()
+    return featured_films
+
+
 @router.post("/films/", response_model=FilmResponse)
 def create_film(film: FilmCreate, db: Session = Depends(get_db)):
     db_film = Film(**film.dict(), last_update=datetime.now())
