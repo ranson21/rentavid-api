@@ -20,3 +20,4 @@ class Film(Base):
     rating = Column(String)
     last_update = Column(DateTime)
     categories = relationship("FilmCategory", back_populates="film")
+    actors = relationship("FilmActor", back_populates="film")
