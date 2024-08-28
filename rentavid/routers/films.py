@@ -135,7 +135,7 @@ def get_featured_films(db: Session = Depends(get_db)):
     return featured_films
 
 
-@router.get("/films/", response_model=FilmList)
+@router.get("/films", response_model=FilmList)
 def read_films(
     db: Session = Depends(get_db),
     release_year: Optional[int] = Query(None),
