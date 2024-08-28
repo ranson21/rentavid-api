@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.sql.expression import func
 from sqlalchemy import case, func, desc, or_
+from math import ceil
 
 
 from typing import List, Optional
@@ -17,22 +18,34 @@ router = APIRouter()
 
 
 class FilmBase(BaseModel):
-    title: str
+    title: Optional[str] = None
     description: Optional[str] = None
     backdrop_path: Optional[str] = None
     poster_path: Optional[str] = None
     description: Optional[str] = None
     release_year: Optional[int] = None
-    language_id: int
-    rental_duration: int
-    rental_rate: float
-    length: Optional[int] = None
-    replacement_cost: float
+    language_id: Optional[int] = None
+    rental_rate: Optional[float] = None
     rating: Optional[str] = None
+    replacement_cost: Optional[float] = None
+    length: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FilmCreate(FilmBase):
     pass
+
+
+class PaginationInfo(BaseModel):
+    total_items: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class FilmList(FilmBase):
+    pagination: PaginationInfo
+    films: List[FilmBase]
 
 
 class FilmResponse(FilmBase):
@@ -121,19 +134,69 @@ def get_featured_films(db: Session = Depends(get_db)):
     return featured_films
 
 
-@router.post("/films/", response_model=FilmResponse)
-def create_film(film: FilmCreate, db: Session = Depends(get_db)):
-    db_film = Film(**film.dict(), last_update=datetime.now())
-    db.add(db_film)
-    db.commit()
-    db.refresh(db_film)
-    return db_film
+@router.get("/films/", response_model=FilmList)
+def read_films(
+    db: Session = Depends(get_db),
+    release_year: Optional[int] = Query(None),
+    languages: Optional[List[int]] = Query(None),
+    rental_rate: Optional[float] = Query(None),
+    rating: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    query = db.query(Film)
 
+    # Apply filters
+    if release_year:
+        query = query.filter(Film.release_year == release_year)
+    if languages:
+        query = query.filter(Film.language_id.in_(languages))
+    if rental_rate:
+        query = query.filter(Film.rental_rate <= rental_rate)
+    if rating:
+        query = query.filter(Film.rating == rating)
 
-@router.get("/films/", response_model=List[FilmResponse])
-def read_films(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    films = db.query(Film).offset(skip).limit(limit).all()
-    return films
+    # Apply sorting
+    if sort_by:
+        if sort_by.startswith("-"):
+            query = query.order_by(getattr(Film, sort_by[1:]).desc())
+        else:
+            query = query.order_by(getattr(Film, sort_by))
+
+    # Get total count
+    total_items = query.count()
+
+    # Calculate pagination
+    total_pages = ceil(total_items / limit)
+    offset = (page - 1) * limit
+
+    # Apply pagination
+    films = query.offset(offset).limit(limit).all()
+
+    # Convert SQLAlchemy objects to dictionaries
+    film_dicts = []
+    for film in films:
+        film_dict = {
+            "film_id": film.film_id,
+            "title": film.title,
+            "release_year": film.release_year,
+            "language_id": film.language_id,
+            "rental_rate": film.rental_rate,
+            "rating": film.rating,
+            "replacement_cost": film.replacement_cost,
+            "poster_path": film.poster_path,
+            "backdrop_path": film.backdrop_path,
+            # Add any other fields that are in your Film model
+        }
+        film_dicts.append(film_dict)
+
+    # Create pagination info
+    pagination_info = PaginationInfo(
+        total_items=total_items, page=page, page_size=limit, total_pages=total_pages
+    )
+
+    return FilmList(pagination=pagination_info, films=film_dicts)
 
 
 @router.get("/films/{film_id}", response_model=FilmResponse)
