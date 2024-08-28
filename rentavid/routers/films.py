@@ -25,6 +25,7 @@ class FilmBase(BaseModel):
     poster_path: Optional[str] = None
     description: Optional[str] = None
     release_year: Optional[int] = None
+    rental_duration: Optional[int] = None
     language_id: Optional[int] = None
     rental_rate: Optional[float] = None
     rating: Optional[str] = None
@@ -188,6 +189,7 @@ def read_films(
             "replacement_cost": film.replacement_cost,
             "poster_path": film.poster_path,
             "backdrop_path": film.backdrop_path,
+            "rental_duration": film.rental_duration,
             # Add any other fields that are in your Film model
         }
         film_dicts.append(film_dict)
