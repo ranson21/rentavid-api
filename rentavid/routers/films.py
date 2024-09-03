@@ -2,15 +2,16 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.sql.expression import func
-from sqlalchemy import case, func, desc, or_
+from sqlalchemy import case, func, desc, or_, text
 from math import ceil
-
+import re
 
 from typing import List, Optional
 from datetime import datetime
 
 from ..dependencies import get_db
 from ..models.film import Film
+from ..models.language import Language
 from ..models.category import FilmCategory
 
 
@@ -139,32 +140,43 @@ def get_featured_films(db: Session = Depends(get_db)):
 @router.get("/films", response_model=FilmList)
 def read_films(
     db: Session = Depends(get_db),
-    release_year: Optional[int] = Query(None),
-    languages: Optional[List[int]] = Query(None),
-    rental_rate: Optional[float] = Query(None),
+    releaseYear: Optional[int] = Query(None),
+    languages: Optional[str] = Query(None),
+    rentalRate: Optional[float] = Query(None),
     rating: Optional[str] = Query(None),
-    sort_by: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ):
     query = db.query(Film)
 
     # Apply filters
-    if release_year:
-        query = query.filter(Film.release_year == release_year)
+    if releaseYear:
+        query = query.filter(Film.release_year <= releaseYear)
     if languages:
-        query = query.filter(Film.language_id.in_(languages))
-    if rental_rate:
-        query = query.filter(Film.rental_rate <= rental_rate)
+        languageList = [
+            id[0]
+            for id in db.query(Language.language_id)
+            .with_entities(Language.language_id)
+            .filter(Language.name.in_(languages.split(",")))
+            .all()
+        ]
+
+        query = query.filter(Film.language_id.in_(languageList))
+    if rentalRate:
+        query = query.filter(Film.rental_rate <= rentalRate)
     if rating:
-        query = query.filter(Film.rating == rating)
+        query = query.filter(Film.rating.in_(rating.split(",")))
+
+    order_by, sort_order = sort.split("_")
+    order_by = re.sub(r"(?<!^)(?=[A-Z])", "_", order_by).lower()
 
     # Apply sorting
-    if sort_by:
-        if sort_by.startswith("-"):
-            query = query.order_by(getattr(Film, sort_by[1:]).desc())
+    if order_by and sort_order:
+        if sort_order == "desc":
+            query = query.order_by(getattr(Film, order_by).desc())
         else:
-            query = query.order_by(getattr(Film, sort_by))
+            query = query.order_by(getattr(Film, order_by))
 
     # Get total count
     total_items = query.count()
@@ -190,6 +202,8 @@ def read_films(
             "poster_path": film.poster_path,
             "backdrop_path": film.backdrop_path,
             "rental_duration": film.rental_duration,
+            "description": film.description,
+            "length": film.length,
             # Add any other fields that are in your Film model
         }
         film_dicts.append(film_dict)

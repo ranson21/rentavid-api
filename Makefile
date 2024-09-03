@@ -1,5 +1,5 @@
 run:
-	@command poetry run fastapi run rentavid/main.py --port 8000
+	@command poetry run fastapi run rentavid/main.py --port 8000 --reload
 
 build:
 	DOCKER_BUILDKIT=1 docker build -t rentavid-api .
