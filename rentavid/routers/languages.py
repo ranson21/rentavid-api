@@ -15,7 +15,7 @@ def create_language(language: language.LanguageCreate, db: Session = Depends(get
     return language.create_language(db=db, language=language)
 
 
-@router.get("/languages/", response_model=List[language.LanguageResponse])
+@router.get("/languages", response_model=List[language.LanguageResponse])
 def read_languages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     languages = language.get_languages(db, skip=skip, limit=limit)
     return languages
